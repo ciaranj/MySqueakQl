@@ -47,14 +47,12 @@
         for(int i=0;i< [okOrErrorPacket length]; i++ ) {
             fprintf(stderr, "%x ", resultPacketData[i]);
         }
+        [errorMessage release];
     }
     else {
         NSLog(@"HAPPPY PACKET");
-        
     }
-    
-    NSString* meh= [[NSString alloc] initWithData:okOrErrorPacket encoding:NSASCIIStringEncoding];
-    NSLog(@"%@", meh);    
+    [okOrErrorPacket release];
 }
 
 -(void) performQuery:(NSString*)query {
@@ -67,9 +65,10 @@
         uint16_t errorNumber= resultPacketData[1] + (resultPacketData[2]<<8);
         // sqlstate is chars 3-> 8
         
-        NSString* errorMessage= [[NSString alloc] initWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
+        NSString* errorMessage= [NSString stringWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
         
         NSLog(@"ERROR: %@ (%u)", errorMessage, errorNumber);
+        [okOrErrorPacket release]; // We release this on the happy path when we release 'resultSetHeaderPacket'
     }
     else {
         NSLog(@"HAPPPY PACKET");
@@ -95,9 +94,5 @@
         [resultSetHeaderPacket release];
  
     }
-    for(int i=0;i< [okOrErrorPacket length]; i++ ) {
-        fprintf(stderr, "%x ", resultPacketData[i]);
-    }
-    fprintf(stderr, "\n");
 }
 @end

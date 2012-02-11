@@ -29,7 +29,7 @@ NSInputStream* input;
 NSOutputStream* output;
 @private
 }
--(NSData *) readPacket;
+-(NSData *) readPacket __attribute((ns_returns_retained));
 -(void) sendPacket:(NSData*)packet;
 -(void) sendUint32:(UInt32)value toStream:(NSOutputStream*)stream;
 

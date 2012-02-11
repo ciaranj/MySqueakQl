@@ -25,9 +25,7 @@
 
 @implementation MySqlProtocol
 -(NSData *) readPacket {
-    NSMutableData* packet= [[NSMutableData alloc] initWithCapacity:30000];
-    [packet retain];
-    
+    NSMutableData* packet= [[NSMutableData alloc] initWithCapacity:4096];
     uint8_t buffer[4096];
     long rc1;
     rc1= [input read:buffer maxLength:4];
@@ -85,8 +83,8 @@
     
     UInt8* byteData= (UInt8*)[handshakeInitialisationPacket bytes];
     UInt8 protcol_version= *(byteData++);
-    NSString* server_version= [[NSString alloc] initWithCString: (const char*)byteData
-                                                       encoding:NSASCIIStringEncoding];
+    NSString* server_version= [NSString stringWithCString: (const char*)byteData
+                                                 encoding:NSASCIIStringEncoding];
     byteData+=[server_version length]+1; // assumes 1byteperchar [ascii]
     byteData+=4; // Skip the thread_id
     [scrambleBuffer appendBytes:byteData length:8];
@@ -109,7 +107,6 @@
     NSLog(@"Handshaking to Server Version '%@' using Protocol version: %d Language: %d", server_version, protcol_version, server_language);
     
     NSMutableData *client_auth_packet= [[NSMutableData alloc] initWithCapacity:100];
-    [client_auth_packet retain];
     UInt32 client_capabilities= server_capabilities;
     client_capabilities= client_capabilities &~ 8; // Not specifying database on connection.
     client_capabilities= client_capabilities &~ 32; // Do not use compression
@@ -175,6 +172,7 @@
     for(i= 0;i< CC_SHA1_DIGEST_LENGTH;i++) {
         token[i]= stage3[i]^stage1[i];
     }
+    [scrambleBuffer release];
     
     val=CC_SHA1_DIGEST_LENGTH;
     [client_auth_packet appendBytes:&val length:1];
@@ -187,8 +185,7 @@
     if( resultPacketData[0] == 0xFF ) {
         uint16_t errorNumber= resultPacketData[1] + (resultPacketData[2]<<8);
         // sqlstate is chars 3-> 8
-        
-        NSString* errorMessage= [[NSString alloc] initWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
+        NSString* errorMessage= [NSString stringWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
         
         NSLog(@"ERROR: %@ (%u)", errorMessage, errorNumber);
         for(int i=0;i< [okOrErrorPacket length]; i++ ) {
@@ -199,9 +196,6 @@
         NSLog(@"HAPPPY PACKET");
         
     }
-    
-    NSString* meh= [[NSString alloc] initWithData:okOrErrorPacket encoding:NSASCIIStringEncoding];
-    NSLog(@"%@", meh);
     [okOrErrorPacket release];
 }
 
@@ -212,6 +206,7 @@
         [dataToSend appendData:data];
     }
     [self sendPacket:dataToSend];
+    [dataToSend release];
 }
 
 -(bool) isEOFPacket:(NSData*)data {
@@ -231,6 +226,7 @@
 
 -(void)dealloc {
     if( input != NULL ) {
+        NSLog(@"Quit");
         [self sendCommand:1 data:NULL];
         [input close];
         [output close];
