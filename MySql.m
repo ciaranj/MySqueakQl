@@ -194,7 +194,7 @@
     
     NSString* meh= [[NSString alloc] initWithData:okOrErrorPacket encoding:NSASCIIStringEncoding];
     NSLog(@"%@", meh);
-    
+    [okOrErrorPacket release];
 }
 
 -(void) sendCommand:(UInt8)command data:(NSData*)data {
@@ -279,21 +279,24 @@
     else {
         NSLog(@"HAPPPY PACKET");
         NSData *resultSetHeaderPacket= okOrErrorPacket;
-        [resultSetHeaderPacket retain];
         UInt8 fieldCount= *((unsigned char*)[resultSetHeaderPacket bytes]);
         NSLog(@"Found %d fields...",fieldCount);
         NSData* fieldDescriptor= [self readPacket];
+        
         while( ![self isEOFPacket: fieldDescriptor ] ) {
    //         NSLog(@"Read a field."); 
+            [fieldDescriptor release];
             fieldDescriptor= [self readPacket];
         }
+        [fieldDescriptor release];
         
         NSData* rowDataPacket= [self readPacket];
         while( ![self isEOFPacket: rowDataPacket ] ) {
     //        NSLog(@"Read a RowPacket."); 
+            [rowDataPacket release];
             rowDataPacket= [self readPacket];
         }
-
+        [rowDataPacket release];
         [resultSetHeaderPacket release];
  
     }
