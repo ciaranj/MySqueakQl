@@ -27,7 +27,7 @@ Add the class files to your XCode project, and use like this:
 
 Dependencies
 ------------
-The only non iOS dependency currently is I'm using the sha functions in libcrypto, but I'll move that to use the commoncrypto library shortly.
+Standard iOS libraries, nothing exotic required.
 
 License
 -------

@@ -11,7 +11,7 @@
 //  Created by Ciaran on 01/02/2012.
 //
 #import "MySql.h"
-#include "sha.h"
+#import <CommonCrypto/CommonDigest.h>
 
 @implementation MySql
 @synthesize packetNumber,input,output;
@@ -141,36 +141,36 @@
      [client_auth_packet appendBytes:user_c_str length:strlen(user_c_str)];
      [client_auth_packet appendBytes:&val length:1];        
 
-    SHA_CTX context;
-    unsigned char stage1[SHA_DIGEST_LENGTH];
-    unsigned char stage2[SHA_DIGEST_LENGTH];
-    unsigned char stage3[SHA_DIGEST_LENGTH];
-    memset(stage1, 0, SHA_DIGEST_LENGTH);
-    memset(stage2, 0, SHA_DIGEST_LENGTH);
-    memset(stage3, 0, SHA_DIGEST_LENGTH);
+    CC_SHA1_CTX context;
+    unsigned char stage1[CC_SHA1_DIGEST_LENGTH];
+    unsigned char stage2[CC_SHA1_DIGEST_LENGTH];
+    unsigned char stage3[CC_SHA1_DIGEST_LENGTH];
+    memset(stage1, 0, CC_SHA1_DIGEST_LENGTH);
+    memset(stage2, 0, CC_SHA1_DIGEST_LENGTH);
+    memset(stage3, 0, CC_SHA1_DIGEST_LENGTH);
     const char* cstr_password=[password cStringUsingEncoding:NSASCIIStringEncoding]; // No idea if mysql alows non ascii passwords *sob*
     
-    SHA1_Init(&context);
-    SHA1_Update(&context, cstr_password, strlen(cstr_password));
-    SHA1_Final(stage1, &context);
+    CC_SHA1_Init(&context);
+    CC_SHA1_Update(&context, cstr_password, strlen(cstr_password));
+    CC_SHA1_Final(stage1, &context);
 
-    SHA1_Init(&context);
-    SHA1_Update(&context, stage1, SHA_DIGEST_LENGTH);
-    SHA1_Final(stage2, &context);
+    CC_SHA1_Init(&context);
+    CC_SHA1_Update(&context, stage1, CC_SHA1_DIGEST_LENGTH);
+    CC_SHA1_Final(stage2, &context);
 
-    SHA1_Init(&context);    
-    SHA1_Update(&context,[scrambleBuffer bytes], [scrambleBuffer length]);
-    SHA1_Update(&context, stage2, SHA_DIGEST_LENGTH);
-    SHA1_Final(stage3, &context);
+    CC_SHA1_Init(&context);    
+    CC_SHA1_Update(&context,[scrambleBuffer bytes], [scrambleBuffer length]);
+    CC_SHA1_Update(&context, stage2, CC_SHA1_DIGEST_LENGTH);
+    CC_SHA1_Final(stage3, &context);
     
-    unsigned char token[SHA_DIGEST_LENGTH];
-    for(i= 0;i< SHA_DIGEST_LENGTH;i++) {
+    unsigned char token[CC_SHA1_DIGEST_LENGTH];
+    for(i= 0;i< CC_SHA1_DIGEST_LENGTH;i++) {
         token[i]= stage3[i]^stage1[i];
     }
     
-    val=SHA_DIGEST_LENGTH;
+    val=CC_SHA1_DIGEST_LENGTH;
     [client_auth_packet appendBytes:&val length:1];
-    [client_auth_packet appendBytes:&token length:SHA_DIGEST_LENGTH];
+    [client_auth_packet appendBytes:&token length:CC_SHA1_DIGEST_LENGTH];
 
     [self sendPacket:client_auth_packet];
     [client_auth_packet release];
