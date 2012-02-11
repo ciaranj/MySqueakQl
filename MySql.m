@@ -13,8 +13,21 @@
 #import "MySql.h"
 #import <CommonCrypto/CommonDigest.h>
 
+@interface MySql()
+
+-(NSData *) readPacket;
+-(void) sendPacket:(NSData*)packet;
+-(void) sendUint32:(UInt32)value toStream:(NSOutputStream*)stream;
+
+-(void) sendCommand:(UInt8)command data:(NSData*)data;
+-(bool) isEOFPacket:(NSData*)data;
+
+-(void) handshakeForUserName:(NSString*)user password:(NSString*)password;
+
+@end
+
+
 @implementation MySql
-@synthesize packetNumber,input,output;
 
 -(NSData *) readPacket {
     NSMutableData* packet= [[NSMutableData alloc] initWithCapacity:30000];
@@ -214,10 +227,10 @@
         CFStreamCreatePairWithSocketToHost(NULL, (CFStringRef)host, port, &readStream, &writeStream);
         //TODO: assert that both readStream + writeSTream are non-null
         
-        self.input= (NSInputStream*)readStream;
-        self.output=(NSOutputStream*)writeStream;
-        [[self input] open];
-        [[self output] open]; 
+        input= (NSInputStream*)readStream;
+        output=(NSOutputStream*)writeStream;
+        [input open];
+        [output open]; 
 
         [self handshakeForUserName:user
                           password:password];
@@ -225,15 +238,22 @@
     return self;
 }
 
+-(void)dealloc {
+    [self quit];
+    [super dealloc];
+}
+
 -(void) quit {
-    NSLog(@"Quit");    
-    [self sendCommand:1 data:NULL];
-    [input close];
-    [output close];
-    [input release];
-    [output release];
-    input= NULL;
-    output= NULL;
+    NSLog(@"Quit");
+    if( input != NULL ) {
+        [self sendCommand:1 data:NULL];
+        [input close];
+        [output close];
+        [input release];
+        [output release];
+        input= NULL;
+        output= NULL;
+    }
 }
 
 -(void) selectDatabase:(NSString*)database {
