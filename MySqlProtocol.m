@@ -199,19 +199,31 @@
     [okOrErrorPacket release];
 }
 
--(void) sendCommand:(UInt8)command data:(NSData*)data {
-    packetNumber= 0; // Reset the packet number
-    NSMutableData* dataToSend= [[NSMutableData alloc] initWithBytes:&command length:1];
-    if ( data != NULL ) {
-        [dataToSend appendData:data];
-    }
-    [self sendPacket:dataToSend];
-    [dataToSend release];
+-(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(void))block {
+
+    NSLog(@"SEND command %d", command);
+    [data retain];
+    // Dispatch onto our FIFO queue, only one sendCommand (and its continuation block) can occur at a time
+    dispatch_async( queue, ^{
+        NSLog(@"Dispatching command %d", command);
+        packetNumber= 0; // Reset the packet number
+        NSMutableData* dataToSend= [[NSMutableData alloc] initWithBytes:&command length:1];
+        if ( data != NULL ) {
+            [dataToSend appendData:data];
+        }
+        [self sendPacket:dataToSend];
+        [dataToSend release];
+        if ( data != NULL ) { [data release]; }
+        if( block != NULL ) {
+            block();
+        }
+   });
 }
 
 -(bool) isEOFPacket:(NSData*)data {
     return *((unsigned char*)[data bytes]) == 0xFE && [data length] < 9;
 }
+
 -(void) connectToHost:(NSString*)host port:(UInt16)port {
     CFReadStreamRef readStream;
     CFWriteStreamRef writeStream;
@@ -224,10 +236,19 @@
     [output open]; 
 }
 
+- (id)init {
+    self = [super init];
+    if (self) {
+        queue = dispatch_queue_create("me.ciaranj.mysqueakql",NULL);
+        dispatch_retain(queue);
+    }
+    return self;
+}
+
 -(void)dealloc {
     if( input != NULL ) {
         NSLog(@"Quit");
-        [self sendCommand:1 data:NULL];
+        [self sendCommand:1 data:NULL continueWithBlock:NULL];
         [input close];
         [output close];
         [input release];
@@ -235,6 +256,7 @@
         input= NULL;
         output= NULL;
     }
+    dispatch_release(queue);
     
     [super dealloc];
 }

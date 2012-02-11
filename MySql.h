@@ -20,6 +20,6 @@
 
 -(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password;
 -(void) selectDatabase:(NSString*)database;
--(void) performQuery:(NSString*)query;
+-(void) performQuery:(NSString*)query continueWithBlock:(void (^)(void))block;
 
 @end

@@ -28,13 +28,14 @@ NSInputStream* input;
 @private
 NSOutputStream* output;
 @private
+dispatch_queue_t queue;
 }
 -(NSData *) readPacket __attribute((ns_returns_retained));
 -(void) sendPacket:(NSData*)packet;
 -(void) sendUint32:(UInt32)value toStream:(NSOutputStream*)stream;
-
--(void) sendCommand:(UInt8)command data:(NSData*)data;
 -(bool) isEOFPacket:(NSData*)data;
+
+-(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(void))block;
 
 -(void) handshakeForUserName:(NSString*)user password:(NSString*)password;
 -(void) connectToHost:(NSString*)host port:(UInt16)port;
