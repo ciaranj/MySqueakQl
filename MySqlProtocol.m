@@ -102,7 +102,7 @@
     
     // hard-coded 12 here is wrong, should scan upto the null pointer end.
     [scrambleBuffer appendBytes:byteData length:12];
-    byteData+=13;
+    byteData+=12;
     assert( *byteData == 0 );
     
     [handshakeInitialisationPacket release];
