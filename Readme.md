@@ -13,6 +13,18 @@ It was developed in a clean room fashion based solely on the documentation found
 
 As a side note, ObjectiveC is not a language I'm overly familiar with, so this code is of pretty poor quality but may help others access MySQL effectively from their devices.
 
+Usage
+-----
+Add the class files to your XCode project, and use like this: 
+
+    MySql* mySql= [[MySql alloc] initWithHost:@"127.0.0.1" 
+                           port:3306 
+                           user:@"my_mysql_user" 
+                       password:@"my_top_secret_password"];
+    [mySql selectDatabase:@"mysql"];
+    [mySql performQuery:@"select * from user;"];
+    [mySql quit];
+
 Dependencies
 ------------
 The only non iOS dependency currently is I'm using the sha functions in libcrypto, but I'll move that to use the commoncrypto library shortly.
