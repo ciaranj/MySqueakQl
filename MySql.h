@@ -11,18 +11,14 @@
 //  Created by Ciaran on 01/02/2012.
 //
 #import <Foundation/Foundation.h>
+#import "MySqlProtocol.h"
 
 @interface MySql : NSObject {
-@private
-UInt8 packetNumber;
-@private
-NSInputStream* input;
-@private
-NSOutputStream* output;
+
+    MySqlProtocol* protocolImpl;
 }
 
--(id) initWithHost:(NSString *)host port:(int)port user:(NSString *)user password:(NSString *)password;
--(void) quit;
+-(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password;
 -(void) selectDatabase:(NSString*)database;
 -(void) performQuery:(NSString*)query;
 

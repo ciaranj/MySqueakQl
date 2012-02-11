@@ -23,7 +23,7 @@ Add the class files to your XCode project, and use like this:
                        password:@"my_top_secret_password"];
     [mySql selectDatabase:@"mysql"];
     [mySql performQuery:@"select * from user;"];
-    [mySql quit];
+    [mySql release]; //Note, a dealloc/release will send the mysql server a Quit command if it can.
 
 Dependencies
 ------------
