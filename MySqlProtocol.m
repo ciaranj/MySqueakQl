@@ -23,6 +23,10 @@
 #import "MySqlProtocol.h"
 #import <CommonCrypto/CommonDigest.h>
 
+@interface MySqlProtocol()
+// Declare private methods here.
+@end
+
 @implementation MySqlProtocol
 -(NSData *) readPacket {
     NSMutableData* packet= [[NSMutableData alloc] initWithCapacity:4096];
@@ -63,6 +67,60 @@
     rc1=[stream write: &val maxLength:1];
     assert(rc1 == 1);
 }
+
+-(NSNumber*) readLengthCodedLength:(UInt8**) byteDataPtr {
+    //This is a length encoded binary.. for now pretend it isn't.
+    UInt8 firstByte= **byteDataPtr;
+    (*byteDataPtr)++;
+    if( firstByte == 251 ) {
+        return NULL;
+    }
+    else {
+        UInt64 length= 0;
+        if( firstByte <=250 ) {
+            length= firstByte;
+        }
+        else {
+            // I imagine this logic is bobbins..had no test data...
+            switch( firstByte ) {
+                case 252:
+                    length= **byteDataPtr;
+                    length= length + ((UInt64)(*((*byteDataPtr)+1)) << 8);
+                    (*byteDataPtr)+=2;
+                    break;
+                case 253:
+                    length= **byteDataPtr;
+                    length= length + ((UInt64)(*((*byteDataPtr)+1)) << 8);
+                    length= length + ((UInt64)(*((*byteDataPtr)+2)) << 16);
+                    (*byteDataPtr)+=3;
+                case 254:
+                    length= **byteDataPtr;
+                    length= length + ((UInt64)(*((*byteDataPtr)+1)) << 8);
+                    length= length + ((UInt64)(*((*byteDataPtr)+2)) << 16);
+                    length= length + ((UInt64)(*((*byteDataPtr)+3)) << 24);
+                    length= length + ((UInt64)(*((*byteDataPtr)+4)) << 32);
+                    length= length + ((UInt64)(*((*byteDataPtr)+5)) << 40);
+                    length= length + ((UInt64)(*((*byteDataPtr)+6)) << 48);
+                    length= length + ((UInt64)(*((*byteDataPtr)+7)) << 56);
+                    (*byteDataPtr)+=8;
+                    break;
+            }
+        }
+        return [NSNumber numberWithUnsignedLong:length];
+    }
+}
+
+-(NSString*) readLengthCodedString:(UInt8**) byteDataPtr {
+    NSNumber* stringLength= [self readLengthCodedLength:byteDataPtr];
+    if( stringLength != NULL ) {
+        NSString* value= [[NSString alloc]initWithBytes:*byteDataPtr length:[stringLength unsignedIntValue] encoding:NSASCIIStringEncoding];
+        (*byteDataPtr)+=[stringLength unsignedIntValue];
+        return value;
+    } else {
+        return NULL;
+    }
+}
+
 
 -(void) sendPacket:(NSData*)packet {
     //todo ensure not bigger than 16M (I suspect we'll have overflows in the next line : )
@@ -200,12 +258,9 @@
 }
 
 -(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(void))block {
-
-    NSLog(@"SEND command %d", command);
     [data retain];
     // Dispatch onto our FIFO queue, only one sendCommand (and its continuation block) can occur at a time
     dispatch_async( queue, ^{
-        NSLog(@"Dispatching command %d", command);
         packetNumber= 0; // Reset the packet number
         NSMutableData* dataToSend= [[NSMutableData alloc] initWithBytes:&command length:1];
         if ( data != NULL ) {
@@ -240,24 +295,21 @@
     self = [super init];
     if (self) {
         queue = dispatch_queue_create("me.ciaranj.mysqueakql",NULL);
-        dispatch_retain(queue);
+        //dispatch_retain(queue);
     }
     return self;
 }
 
 -(void)dealloc {
     if( input != NULL ) {
-        NSLog(@"Quit");
-        [self sendCommand:1 data:NULL continueWithBlock:NULL];
-        [input close];
-        [output close];
-        [input release];
-        [output release];
-        input= NULL;
-        output= NULL;
+            [input close];
+            [output close];
+            [input release];
+            [output release];
+            input= NULL;
+            output= NULL;
     }
     dispatch_release(queue);
-    
     [super dealloc];
 }
 @end

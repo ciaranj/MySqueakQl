@@ -27,7 +27,9 @@
 }
 
 -(void)dealloc {
-    [protocolImpl dealloc];
+    if( protocolImpl != NULL ) {
+        [protocolImpl dealloc];
+    }
     [super dealloc];
 }
 
@@ -36,9 +38,7 @@
     
     NSLog(@"Select Database");    
     NSData* data=[database dataUsingEncoding:NSUTF8StringEncoding];
-    [protocolImpl sendCommand:2 
-                         data:data
-            continueWithBlock:^(){
+    [protocolImpl sendCommand:2 data:data continueWithBlock:^(){
                 NSData* okOrErrorPacket= [protocolImpl readPacket];
                 UInt8* resultPacketData= (UInt8*)[okOrErrorPacket bytes];
                 if( resultPacketData[0] == 0xFF ) {
@@ -67,14 +67,15 @@
     }
 }
 
--(void) performQuery:(NSString*)query continueWithBlock:(void (^)(void))block {
+-(void) performQuery:(NSString*)query continueWithBlock:(void (^)(MySqlResults* results))block {
     NSLog(@"Execute Query");
     NSData* data=[query dataUsingEncoding:NSUTF8StringEncoding];
-    [protocolImpl sendCommand:3 
-                         data:data
-            continueWithBlock:^(){
+    [protocolImpl sendCommand:3  data:data continueWithBlock:^(){
                 NSData* okOrErrorPacket= [protocolImpl readPacket];
                 UInt8* resultPacketData= (UInt8*)[okOrErrorPacket bytes];
+                MySqlResults* results= [[MySqlResults alloc] init];
+                NSMutableArray* arr= [NSMutableArray arrayWithCapacity:10];
+                results.rows=arr;
                 if( resultPacketData[0] == 0xFF ) {
                     uint16_t errorNumber= resultPacketData[1] + (resultPacketData[2]<<8);
                     // sqlstate is chars 3-> 8
@@ -88,19 +89,53 @@
                     NSLog(@"HAPPPY PACKET");
                     NSData *resultSetHeaderPacket= okOrErrorPacket;
                     UInt8 fieldCount= *((unsigned char*)[resultSetHeaderPacket bytes]);
+                    NSMutableArray* fields= [NSMutableArray arrayWithCapacity:10];
+                    results.fields=fields;
+                    
                     NSLog(@"Found %d fields...",fieldCount);
                     NSData* fieldDescriptor= [protocolImpl readPacket];
+                    UInt8* byteData;
                     
                     while( ![protocolImpl isEOFPacket: fieldDescriptor ] ) {
-                        //         NSLog(@"Read a field."); 
+                        byteData= (UInt8*)[fieldDescriptor bytes];
+                        NSMutableDictionary* field= [NSMutableDictionary dictionary];
+                        NSString* value= [protocolImpl readLengthCodedString:&byteData];
+                        [field setValue: value forKey:@"catalog"];
+                        [value release];
+                        value= [protocolImpl readLengthCodedString:&byteData];
+                        [field setValue:value forKey:@"db"];
+                        [value release];
+                        value= [protocolImpl readLengthCodedString:&byteData];
+                        [field setValue:value forKey:@"table"];
+                        [value release];
+                        value= [protocolImpl readLengthCodedString:&byteData];
+                        [field setValue:value forKey:@"org_table"];
+                        [value release];
+                        value= [protocolImpl readLengthCodedString:&byteData];
+                        [field setValue:value forKey:@"name"];
+                        [value release];
+                        value= [protocolImpl readLengthCodedString:&byteData];
+                        [field setValue:value forKey:@"org_name"];
+                        [value release];
+                        
+                        
+                        [fields addObject: field];
                         [fieldDescriptor release];
                         fieldDescriptor= [protocolImpl readPacket];
                     }
                     [fieldDescriptor release];
-                    
+
+
                     NSData* rowDataPacket= [protocolImpl readPacket];
                     while( ![protocolImpl isEOFPacket: rowDataPacket ] ) {
-                        //        NSLog(@"Read a RowPacket."); 
+                        byteData= (UInt8*)[rowDataPacket bytes];
+                        NSMutableDictionary* record= [NSMutableDictionary dictionary];
+                        for(int i=0;i< fieldCount;i++) {
+                            NSString* value= [protocolImpl readLengthCodedString:&byteData];
+                            [record setValue:value forKey:[ [fields objectAtIndex:i] valueForKey:@"name"]];
+                            [value release];
+                        }
+                        [arr addObject: record];
                         [rowDataPacket release];
                         rowDataPacket= [protocolImpl readPacket];
                     }
@@ -108,7 +143,26 @@
                     [resultSetHeaderPacket release];
                     
                 }
-                block();
+                block( results );
+                [results release];
             }];
 }
+
+-(void) quit {
+    NSLog(@"Quit");
+    volatile __block bool blockCalled= false;
+    [protocolImpl sendCommand:1 data:NULL continueWithBlock:^(){
+        blockCalled= true;
+    }];
+
+    // As an attempt to simplify the external API, we
+    // simulate a blocking API by blocking the calling thread, until
+    // the command's callback block has executed.
+    while(!blockCalled) {
+        [NSThread sleepForTimeInterval:0.01];
+    }
+    [protocolImpl dealloc];
+    protocolImpl= NULL;
+}
+
 @end

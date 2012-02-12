@@ -33,6 +33,9 @@ dispatch_queue_t queue;
 -(NSData *) readPacket __attribute((ns_returns_retained));
 -(void) sendPacket:(NSData*)packet;
 -(void) sendUint32:(UInt32)value toStream:(NSOutputStream*)stream;
+-(NSNumber*) readLengthCodedLength:(UInt8**) byteData;
+-(NSString*) readLengthCodedString:(UInt8**) byteData;
+
 -(bool) isEOFPacket:(NSData*)data;
 
 -(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(void))block;

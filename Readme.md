@@ -22,11 +22,23 @@ Add the class files to your XCode project, and use like this:
                            user:@"my_mysql_user" 
                        password:@"my_top_secret_password"];
     [mySql selectDatabase:@"mysql"];
-    [mySql performQuery:@"select * from user;" continueWithBlock:^(){
-        // Handle the results here.
+    [mySql performQuery:@"select * from user;" continueWithBlock:^(MySqlResults* results){
+        queryResults++;
+        NSLog(@"Received %d results", [results.rows count]);
+        for(NSString* field in [results fields]) {
+            fprintf(stderr, "%s, ", [(NSString*)[field valueForKey:@"name"] cStringUsingEncoding:NSASCIIStringEncoding]);
+        }
+        fprintf(stderr, "\n---------------\n");
+        for( NSDictionary* row in [results rows]) {
+            for(NSString* field in [results fields]) {
+                fprintf(stderr, "%s, ", [(NSString*) [row valueForKey: [field valueForKey:@"name"] ] cStringUsingEncoding:NSASCIIStringEncoding]);
+            }
+            fprintf(stderr, "\n");
+        }   
     }];
     
-    [mySql release]; //Note, a dealloc/release will send the mysql server a Quit command if it can.
+    [mySql quit];
+    [mySql release];
 
 Dependencies
 ------------
