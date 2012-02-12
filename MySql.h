@@ -10,6 +10,9 @@
 //
 //  Created by Ciaran on 01/02/2012.
 //
+#ifndef MySql_h
+#define MySql_h
+
 #import <Foundation/Foundation.h>
 #import "MySqlProtocol.h"
 #import "MySqlResults.h"
@@ -18,9 +21,10 @@
 
     MySqlProtocol* protocolImpl;
 }
-
 -(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password;
+-(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password protocolImplementation:(MySqlProtocol*)protocol;
 -(void) selectDatabase:(NSString*)database;
 -(void) performQuery:(NSString*)query continueWithBlock:(void (^)(MySqlResults *))block;
 -(void) quit;
 @end
+#endif

@@ -14,16 +14,24 @@
 
 @implementation MySql
 
--(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password {
-    self = [super init];
-    if (self) {
-        protocolImpl= [[MySqlProtocol alloc] init];
+-(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password protocolImplementation:(MySqlProtocol*)protocol {
+    if ( self = [super init] ) {
+        protocolImpl= protocol;
         [protocolImpl connectToHost:host 
                                port:port];
         [protocolImpl handshakeForUserName:user
-                          password:password];
+                                  password:password];
     }
     return self;
+}
+
+-(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password {
+    return [self initWithHost:host
+                         port:port
+                         user:user password:password
+                protocolImplementation:[[MySqlProtocol alloc]init]
+            ];
+
 }
 
 -(void)dealloc {

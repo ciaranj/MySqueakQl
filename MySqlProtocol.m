@@ -28,11 +28,32 @@
 @end
 
 @implementation MySqlProtocol
+
+- (NSInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len {
+    return [input read:buffer maxLength:len];
+}
+
+- (NSInteger)write:(const uint8_t *)buffer maxLength:(NSUInteger)len {
+    return [output write:buffer maxLength:len];
+}
+
+-(void) connectToHost:(NSString*)host port:(UInt16)port {
+    CFReadStreamRef readStream;
+    CFWriteStreamRef writeStream;
+    CFStreamCreatePairWithSocketToHost(NULL, (CFStringRef)host, port, &readStream, &writeStream);
+    //TODO: assert that both readStream + writeSTream are non-null
+    
+    input= (NSInputStream*)readStream;
+    output=(NSOutputStream*)writeStream;
+    [input open];
+    [output open]; 
+}
+
 -(NSData *) readPacket {
     NSMutableData* packet= [[NSMutableData alloc] initWithCapacity:4096];
     uint8_t buffer[4096];
     long rc1;
-    rc1= [input read:buffer maxLength:4];
+    rc1= [self read:buffer maxLength:4];
     assert(rc1 == 4);
     uint32_t packet_size= buffer[0] + (buffer[1]<<8) + (buffer[2] << 16);
     packetNumber= buffer[3]+1;
@@ -40,7 +61,7 @@
     
     uint32_t readSoFar= 0;
     do {
-        rc1= [input read:buffer maxLength:( readSoFar+4096>packet_size?(packet_size-readSoFar):4096)];
+        rc1= [self read:buffer maxLength:( readSoFar+4096>packet_size?(packet_size-readSoFar):4096)];
         readSoFar+= rc1;
         
         if( rc1 > 0 ) {
@@ -55,16 +76,16 @@
     
 }
 
--(void) sendUint32: (UInt32)value toStream:(NSOutputStream*)stream {
+-(void) sendUint32: (UInt32)value{
     uint8_t val= value & 0xFF;
     long rc1;
-    rc1= [stream write: &val maxLength:1];
+    rc1= [self write: &val maxLength:1];
     assert(rc1 == 1);
     val= (value & 0xFF00)>>8;
-    rc1= [stream write: &val maxLength:1];
+    rc1= [self write: &val maxLength:1];
     assert(rc1 == 1);
     val= (value & 0xFF0000)>>16;
-    rc1=[stream write: &val maxLength:1];
+    rc1=[self write: &val maxLength:1];
     assert(rc1 == 1);
 }
 
@@ -125,11 +146,11 @@
 -(void) sendPacket:(NSData*)packet {
     //todo ensure not bigger than 16M (I suspect we'll have overflows in the next line : )
     
-    [self sendUint32:(UInt32)[packet length] toStream:output];
+    [self sendUint32:(UInt32)[packet length]];
     
-    int rc1= [output write:&packetNumber maxLength:1];
+    int rc1= [self write:&packetNumber maxLength:1];
     assert( rc1 == 1 );
-    rc1= [output write:[packet bytes] maxLength:[packet length]];
+    rc1= [self write:[packet bytes] maxLength:[packet length]];
     assert( rc1 == [packet length] );
     
     NSLog(@"Sent Packet Number : %d of size %ul", packetNumber,[packet length]);
@@ -279,23 +300,10 @@
     return *((unsigned char*)[data bytes]) == 0xFE && [data length] < 9;
 }
 
--(void) connectToHost:(NSString*)host port:(UInt16)port {
-    CFReadStreamRef readStream;
-    CFWriteStreamRef writeStream;
-    CFStreamCreatePairWithSocketToHost(NULL, (CFStringRef)host, port, &readStream, &writeStream);
-    //TODO: assert that both readStream + writeSTream are non-null
-
-    input= (NSInputStream*)readStream;
-    output=(NSOutputStream*)writeStream;
-    [input open];
-    [output open]; 
-}
-
 - (id)init {
     self = [super init];
     if (self) {
-        queue = dispatch_queue_create("me.ciaranj.mysqueakql",NULL);
-        //dispatch_retain(queue);
+        queue = dispatch_queue_create("me.ciaranj.mysqueakql", NULL);
     }
     return self;
 }

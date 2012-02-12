@@ -18,6 +18,9 @@
 //
 //  Created by Ciaran on 11/02/2012.
 //
+#ifndef MySqlProtocol_h
+#define MySqlProtocol_h
+
 #import <Foundation/Foundation.h>
 
 @interface MySqlProtocol : NSObject {
@@ -30,9 +33,18 @@ NSOutputStream* output;
 @private
 dispatch_queue_t queue;
 }
+
+// These methods could be over-ridden if you neede a non-standard
+// connection to the mysql server (for example via a proxy server
+// or over an SSH tunnel)
+- (NSInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len;
+- (NSInteger)write:(const uint8_t *)buffer maxLength:(NSUInteger)len;
+- (void) connectToHost:(NSString*)host port:(UInt16)port;
+
+
 -(NSData *) readPacket __attribute((ns_returns_retained));
 -(void) sendPacket:(NSData*)packet;
--(void) sendUint32:(UInt32)value toStream:(NSOutputStream*)stream;
+-(void) sendUint32:(UInt32)value;
 -(NSNumber*) readLengthCodedLength:(UInt8**) byteData;
 -(NSString*) readLengthCodedString:(UInt8**) byteData;
 
@@ -41,5 +53,5 @@ dispatch_queue_t queue;
 -(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(void))block;
 
 -(void) handshakeForUserName:(NSString*)user password:(NSString*)password;
--(void) connectToHost:(NSString*)host port:(UInt16)port;
 @end
+#endif
