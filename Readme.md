@@ -22,7 +22,7 @@ Add the class files to your XCode project, and use like this:
                            user:@"my_mysql_user" 
                        password:@"my_top_secret_password"];
     [mySql selectDatabase:@"mysql"];
-    [mySql performQuery:@"select * from user;" continueWithBlock:^(MySqlResults* results){
+    [mySql performQuery:@"SELECT * FROM user;" continueWithBlock:^(MySqlResults* results){
         queryResults++;
         NSLog(@"Received %d results", [results.rows count]);
         for(NSString* field in [results fields]) {
@@ -36,7 +36,11 @@ Add the class files to your XCode project, and use like this:
             fprintf(stderr, "\n");
         }   
     }];
-    
+    [mySql performQuery:@"UPDATE user SET Host='xxxx' WHERE user='SpongeBobSquarePants'" continueWithBlock:^(MySqlResults* results){
+        if( [results affectedRows] > 0 ) {
+            NSLog(@"Affected %@ rows", [results affectedRows]);
+        }
+    }];
     [mySql quit];
     [mySql release];
 

@@ -80,78 +80,89 @@
     NSLog(@"Execute Query");
     NSData* data=[query dataUsingEncoding:NSUTF8StringEncoding];
     [protocolImpl sendCommand:3  data:data continueWithBlock:^(){
-                NSData* okOrErrorPacket= [protocolImpl readPacket];
-                UInt8* resultPacketData= (UInt8*)[okOrErrorPacket bytes];
+                NSData* initialServerResponsePacket= [protocolImpl readPacket];
+                UInt8* resultPacketData= (UInt8*)[initialServerResponsePacket bytes];
                 MySqlResults* results= [[MySqlResults alloc] init];
-                NSMutableArray* arr= [NSMutableArray arrayWithCapacity:10];
-                results.rows=arr;
-                if( resultPacketData[0] == 0xFF ) {
+                if( *resultPacketData == 0xFF ) {
                     uint16_t errorNumber= resultPacketData[1] + (resultPacketData[2]<<8);
                     // sqlstate is chars 3-> 8
                     
                     NSString* errorMessage= [NSString stringWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
                     
                     NSLog(@"ERROR: %@ (%u)", errorMessage, errorNumber);
-                    [okOrErrorPacket release]; // We release this on the happy path when we release 'resultSetHeaderPacket'
                 }
                 else {
-                    NSLog(@"HAPPPY PACKET");
-                    NSData *resultSetHeaderPacket= okOrErrorPacket;
-                    UInt8 fieldCount= *((unsigned char*)[resultSetHeaderPacket bytes]);
-                    NSMutableArray* fields= [NSMutableArray arrayWithCapacity:10];
-                    results.fields=fields;
-                    
-                    NSLog(@"Found %d fields...",fieldCount);
-                    NSData* fieldDescriptor= [protocolImpl readPacket];
-                    UInt8* byteData;
-                    
-                    while( ![protocolImpl isEOFPacket: fieldDescriptor ] ) {
-                        byteData= (UInt8*)[fieldDescriptor bytes];
-                        NSMutableDictionary* field= [NSMutableDictionary dictionary];
-                        NSString* value= [protocolImpl readLengthCodedString:&byteData];
-                        [field setValue: value forKey:@"catalog"];
-                        [value release];
-                        value= [protocolImpl readLengthCodedString:&byteData];
-                        [field setValue:value forKey:@"db"];
-                        [value release];
-                        value= [protocolImpl readLengthCodedString:&byteData];
-                        [field setValue:value forKey:@"table"];
-                        [value release];
-                        value= [protocolImpl readLengthCodedString:&byteData];
-                        [field setValue:value forKey:@"org_table"];
-                        [value release];
-                        value= [protocolImpl readLengthCodedString:&byteData];
-                        [field setValue:value forKey:@"name"];
-                        [value release];
-                        value= [protocolImpl readLengthCodedString:&byteData];
-                        [field setValue:value forKey:@"org_name"];
-                        [value release];
-                        
-                        
-                        [fields addObject: field];
-                        [fieldDescriptor release];
-                        fieldDescriptor= [protocolImpl readPacket];
+                    if( *resultPacketData == 0x00 ) {
+                        // OK Packet
+                        resultPacketData++;
+                        results.affectedRows= [protocolImpl readLengthCodedLength:&resultPacketData];
+                        //NSNumber* insertId=
+                        [protocolImpl readLengthCodedLength:&resultPacketData];
+                        //UInt16 serverStatus= *resultPacketData + ((*(resultPacketData+1))<<8);
+                        resultPacketData+=2;
+                        //UInt16 warningCount= *resultPacketData + ((*(resultPacketData+1))<<8);
+                        resultPacketData+=2;
+                        // Meh ignore the message (remaining part of packet)
                     }
-                    [fieldDescriptor release];
-
-
-                    NSData* rowDataPacket= [protocolImpl readPacket];
-                    while( ![protocolImpl isEOFPacket: rowDataPacket ] ) {
-                        byteData= (UInt8*)[rowDataPacket bytes];
-                        NSMutableDictionary* record= [NSMutableDictionary dictionary];
-                        for(int i=0;i< fieldCount;i++) {
+                    else {
+                        // Result Set Packet
+                        UInt8 fieldCount= *((unsigned char*)[initialServerResponsePacket bytes]);
+                        NSMutableArray* fields= [NSMutableArray arrayWithCapacity:10];
+                        results.fields=fields;
+                        results.affectedRows= [NSNumber numberWithUnsignedInt:0];
+                        NSLog(@"Found %d fields...",fieldCount);
+                        NSData* fieldDescriptor= [protocolImpl readPacket];
+                        UInt8* byteData;
+                        
+                        while( ![protocolImpl isEOFPacket: fieldDescriptor ] ) {
+                            byteData= (UInt8*)[fieldDescriptor bytes];
+                            NSMutableDictionary* field= [NSMutableDictionary dictionary];
                             NSString* value= [protocolImpl readLengthCodedString:&byteData];
-                            [record setValue:value forKey:[ [fields objectAtIndex:i] valueForKey:@"name"]];
+                            [field setValue: value forKey:@"catalog"];
                             [value release];
+                            value= [protocolImpl readLengthCodedString:&byteData];
+                            [field setValue:value forKey:@"db"];
+                            [value release];
+                            value= [protocolImpl readLengthCodedString:&byteData];
+                            [field setValue:value forKey:@"table"];
+                            [value release];
+                            value= [protocolImpl readLengthCodedString:&byteData];
+                            [field setValue:value forKey:@"org_table"];
+                            [value release];
+                            value= [protocolImpl readLengthCodedString:&byteData];
+                            [field setValue:value forKey:@"name"];
+                            [value release];
+                            value= [protocolImpl readLengthCodedString:&byteData];
+                            [field setValue:value forKey:@"org_name"];
+                            [value release];
+
+
+                            [fields addObject: field];
+                            [fieldDescriptor release];
+                            fieldDescriptor= [protocolImpl readPacket];
                         }
-                        [arr addObject: record];
+                        [fieldDescriptor release];
+
+                        NSMutableArray* arr= [NSMutableArray arrayWithCapacity:10];
+                        results.rows=arr;
+
+                        NSData* rowDataPacket= [protocolImpl readPacket];
+                        while( ![protocolImpl isEOFPacket: rowDataPacket ] ) {
+                            byteData= (UInt8*)[rowDataPacket bytes];
+                            NSMutableDictionary* record= [NSMutableDictionary dictionary];
+                            for(int i=0;i< fieldCount;i++) {
+                                NSString* value= [protocolImpl readLengthCodedString:&byteData];
+                                [record setValue:value forKey:[ [fields objectAtIndex:i] valueForKey:@"name"]];
+                                [value release];
+                            }
+                            [arr addObject: record];
+                            [rowDataPacket release];
+                            rowDataPacket= [protocolImpl readPacket];
+                        }
                         [rowDataPacket release];
-                        rowDataPacket= [protocolImpl readPacket];
                     }
-                    [rowDataPacket release];
-                    [resultSetHeaderPacket release];
-                    
                 }
+                [initialServerResponsePacket release]; // We release this on the happy path when we release 'resultSetHeaderPacket'
                 block( results );
                 [results release];
             }];

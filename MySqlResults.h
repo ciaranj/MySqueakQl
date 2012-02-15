@@ -12,5 +12,6 @@
 @interface MySqlResults : NSObject
 @property (retain) NSArray* rows;
 @property (retain) NSArray* fields;
+@property (retain) NSNumber* affectedRows;
 @end
 #endif
