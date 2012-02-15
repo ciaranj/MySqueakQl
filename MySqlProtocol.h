@@ -46,7 +46,7 @@ dispatch_queue_t queue;
 -(void) sendPacket:(NSData*)packet;
 -(void) sendUint32:(UInt32)value;
 -(NSNumber*) readLengthCodedLength:(UInt8**) byteData;
--(NSString*) readLengthCodedString:(UInt8**) byteData;
+-(NSString*) readLengthCodedString:(UInt8**) byteData __attribute((ns_returns_retained));
 
 -(bool) isEOFPacket:(NSData*)data;
 

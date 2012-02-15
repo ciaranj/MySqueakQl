@@ -114,6 +114,7 @@
                     length= length + ((UInt64)(*((*byteDataPtr)+1)) << 8);
                     length= length + ((UInt64)(*((*byteDataPtr)+2)) << 16);
                     (*byteDataPtr)+=3;
+                    break;
                 case 254:
                     length= **byteDataPtr;
                     length= length + ((UInt64)(*((*byteDataPtr)+1)) << 8);

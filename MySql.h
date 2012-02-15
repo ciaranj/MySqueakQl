@@ -17,12 +17,11 @@
 #import "MySqlProtocol.h"
 #import "MySqlResults.h"
 
-@interface MySql : NSObject {
+@interface MySql : NSObject
+@property(retain) MySqlProtocol* protocolImpl;
 
-    MySqlProtocol* protocolImpl;
-}
 -(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password;
--(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password protocolImplementation:(MySqlProtocol*)protocol;
+-(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password protocolImplementation:(MySqlProtocol*) __attribute__((ns_consumed)) protocol;
 -(void) selectDatabase:(NSString*)database;
 -(void) performQuery:(NSString*)query continueWithBlock:(void (^)(MySqlResults *))block;
 -(void) quit;

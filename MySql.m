@@ -13,6 +13,7 @@
 #import "MySql.h"
 
 @implementation MySql
+@synthesize protocolImpl;
 
 -(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password protocolImplementation:(MySqlProtocol*)protocol {
     if ( self = [super init] ) {
@@ -36,7 +37,7 @@
 
 -(void)dealloc {
     if( protocolImpl != NULL ) {
-        [protocolImpl dealloc];
+        [protocolImpl release];
     }
     [super dealloc];
 }

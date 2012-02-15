@@ -13,12 +13,8 @@
 @synthesize rows, fields;
 
 - (void)dealloc {
-    if( rows != NULL ) {
-        [rows release];
-    }
-    if( fields != NULL ) {
-        [fields release];
-    }
+    [rows release];
+    [fields release];
     [super dealloc];
 }
 @end
