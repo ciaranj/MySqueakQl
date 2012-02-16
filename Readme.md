@@ -23,7 +23,6 @@ Add the class files to your XCode project, and use like this:
                        password:@"my_top_secret_password"];
     [mySql selectDatabase:@"mysql"];
     [mySql performQuery:@"SELECT * FROM user;" continueWithBlock:^(MySqlResults* results){
-        queryResults++;
         NSLog(@"Received %d results", [results.rows count]);
         for(NSString* field in [results fields]) {
             fprintf(stderr, "%s, ", [(NSString*)[field valueForKey:@"name"] cStringUsingEncoding:NSASCIIStringEncoding]);
