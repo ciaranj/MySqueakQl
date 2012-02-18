@@ -10,12 +10,13 @@
 
 @implementation MySqlResults
 
-@synthesize rows, fields, affectedRows;
+@synthesize rows, fields, affectedRows, insertId;
 
 - (void)dealloc {
     [rows release];
     [fields release];
     [affectedRows release];
+    [insertId release];
     [super dealloc];
 }
 @end

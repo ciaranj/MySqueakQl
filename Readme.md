@@ -40,6 +40,14 @@ Add the class files to your XCode project, and use like this:
             NSLog(@"Affected %@ rows", [results affectedRows]);
         }
     }];
+
+    [mySql performQuery:@"INSERT INTO user (user,host) VALUES ('bob','localhost')" continueWithBlock:^(MySqlResults* results){
+        if( [results affectedRows] > 0 ) {
+            NSLog(@"Affected %@ rows (Insert id: %@)", [results affectedRows], [results insertId]);
+        }
+    }];
+
+insertId
     [mySql quit];
     [mySql release];
 

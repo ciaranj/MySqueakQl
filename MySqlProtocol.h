@@ -34,7 +34,7 @@ NSOutputStream* output;
 dispatch_queue_t queue;
 }
 
-// These methods could be over-ridden if you neede a non-standard
+// These methods could be over-ridden if you require a non-standard
 // connection to the mysql server (for example via a proxy server
 // or over an SSH tunnel)
 - (NSInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len;

@@ -96,8 +96,7 @@
                         // OK Packet
                         resultPacketData++;
                         results.affectedRows= [protocolImpl readLengthCodedLength:&resultPacketData];
-                        //NSNumber* insertId=
-                        [protocolImpl readLengthCodedLength:&resultPacketData];
+                        results.insertId= [protocolImpl readLengthCodedLength:&resultPacketData];
                         //UInt16 serverStatus= *resultPacketData + ((*(resultPacketData+1))<<8);
                         resultPacketData+=2;
                         //UInt16 warningCount= *resultPacketData + ((*(resultPacketData+1))<<8);

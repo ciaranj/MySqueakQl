@@ -13,5 +13,6 @@
 @property (retain) NSArray* rows;
 @property (retain) NSArray* fields;
 @property (retain) NSNumber* affectedRows;
+@property (retain) NSNumber* insertId;
 @end
 #endif
