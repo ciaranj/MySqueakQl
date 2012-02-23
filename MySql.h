@@ -21,7 +21,7 @@
 @property(retain) MySqlProtocol* protocolImpl;
 
 -(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password;
--(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password protocolImplementation:(MySqlProtocol*) __attribute__((ns_consumed)) protocol;
+-(id) initWithProtocol:(MySqlProtocol*) __attribute__((ns_consumed)) protocol user:(NSString *)user password:(NSString *)password;
 -(void) selectDatabase:(NSString*)database;
 -(void) performQuery:(NSString*)query continueWithBlock:(void (^)(MySqlResults *))block;
 -(void) quit;

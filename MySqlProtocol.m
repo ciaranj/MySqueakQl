@@ -28,6 +28,7 @@
 @end
 
 @implementation MySqlProtocol
+@synthesize host,port;
 
 - (NSInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len {
     return [input read:buffer maxLength:len];
@@ -37,7 +38,7 @@
     return [output write:buffer maxLength:len];
 }
 
--(void) connectToHost:(NSString*)host port:(UInt16)port {
+-(int) connect {
     CFReadStreamRef readStream;
     CFWriteStreamRef writeStream;
     CFStreamCreatePairWithSocketToHost(NULL, (CFStringRef)host, port, &readStream, &writeStream);
@@ -46,7 +47,8 @@
     input= (NSInputStream*)readStream;
     output=(NSOutputStream*)writeStream;
     [input open];
-    [output open]; 
+    [output open];
+    return 0;
 }
 
 -(NSData *) readPacket {
@@ -301,9 +303,11 @@
     return *((unsigned char*)[data bytes]) == 0xFE && [data length] < 9;
 }
 
-- (id)init {
+-(id) initWithHost:(NSString *)h port:(UInt16)p {
     self = [super init];
     if (self) {
+        host= h;
+        port= p;
         queue = dispatch_queue_create("me.ciaranj.mysqueakql", NULL);
     }
     return self;

@@ -15,11 +15,10 @@
 @implementation MySql
 @synthesize protocolImpl;
 
--(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password protocolImplementation:(MySqlProtocol*)protocol {
+-(id) initWithProtocol:(MySqlProtocol*) __attribute__((ns_consumed)) protocol user:(NSString *)user password:(NSString *)password {
     if ( self = [super init] ) {
         protocolImpl= protocol;
-        [protocolImpl connectToHost:host 
-                               port:port];
+        [protocolImpl connect];
         [protocolImpl handshakeForUserName:user
                                   password:password];
     }
@@ -27,12 +26,9 @@
 }
 
 -(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password {
-    return [self initWithHost:host
-                         port:port
-                         user:user password:password
-                protocolImplementation:[[MySqlProtocol alloc]init]
-            ];
-
+    return [self initWithProtocol:[[MySqlProtocol alloc]initWithHost:host port:port]
+                             user:user
+                         password:password];
 }
 
 -(void)dealloc {

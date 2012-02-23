@@ -33,13 +33,17 @@ NSOutputStream* output;
 @private
 dispatch_queue_t queue;
 }
+@property (retain) NSString* host;
+@property UInt16 port;
+
+-(id) initWithHost:(NSString *)host port:(UInt16)port;
 
 // These methods could be over-ridden if you require a non-standard
 // connection to the mysql server (for example via a proxy server
 // or over an SSH tunnel)
 - (NSInteger)read:(uint8_t *)buffer maxLength:(NSUInteger)len;
 - (NSInteger)write:(const uint8_t *)buffer maxLength:(NSUInteger)len;
-- (void) connectToHost:(NSString*)host port:(UInt16)port;
+- (int) connect;
 
 
 -(NSData *) readPacket __attribute((ns_returns_retained));
