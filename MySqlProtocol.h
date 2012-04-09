@@ -47,15 +47,15 @@ dispatch_queue_t queue;
 
 
 -(NSData *) readPacket __attribute((ns_returns_retained));
--(void) sendPacket:(NSData*)packet;
--(void) sendUint32:(UInt32)value;
+-(int) sendPacket:(NSData*)packet;
+-(int) sendUint32:(UInt32)value;
 -(NSNumber*) readLengthCodedLength:(UInt8**) byteData;
 -(NSString*) readLengthCodedString:(UInt8**) byteData __attribute((ns_returns_retained));
 
 -(bool) isEOFPacket:(NSData*)data;
 
--(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(void))block;
+-(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(int))block;
 
--(void) handshakeForUserName:(NSString*)user password:(NSString*)password;
+-(int) handshakeForUserName:(NSString*)user password:(NSString*)password;
 @end
 #endif

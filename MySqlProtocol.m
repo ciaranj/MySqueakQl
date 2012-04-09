@@ -56,10 +56,10 @@
     uint8_t buffer[4096];
     long rc1;
     rc1= [self read:buffer maxLength:4];
-    assert(rc1 == 4);
+    if( rc1 != 4 ) return 0;
     uint32_t packet_size= buffer[0] + (buffer[1]<<8) + (buffer[2] << 16);
     packetNumber= buffer[3]+1;
-    NSLog(@"RECVD Packet Number : %d of size %ul", packetNumber, packet_size);
+//    NSLog(@"RECVD Packet Number : %d of size %ul", packetNumber, packet_size);
     
     uint32_t readSoFar= 0;
     do {
@@ -72,23 +72,38 @@
     }
     while( rc1 > 0 && readSoFar<packet_size );  
     
-    assert( readSoFar == packet_size);
+    if( readSoFar != packet_size ) { return 0; }
     
     return packet;
     
 }
 
--(void) sendUint32: (UInt32)value{
+-(int) sendPacket:(NSData*)packet {
+    //todo ensure not bigger than 16M (I suspect we'll have overflows in the next line : )
+    
+    [self sendUint32:(UInt32)[packet length]];
+    
+    int rc1= [self write:&packetNumber maxLength:1];
+    if( rc1 != 1) return 0;
+    rc1= [self write:[packet bytes] maxLength:[packet length]];
+    if ( rc1 != [packet length] ) return 0;
+    
+//    NSLog(@"Sent Packet Number : %d of size %ul", packetNumber,[packet length]);
+    return 1;
+}
+
+-(int) sendUint32: (UInt32)value{
     uint8_t val= value & 0xFF;
     long rc1;
     rc1= [self write: &val maxLength:1];
-    assert(rc1 == 1);
+    if( rc1 != 1 ) return 0;
     val= (value & 0xFF00)>>8;
     rc1= [self write: &val maxLength:1];
-    assert(rc1 == 1);
+    if( rc1 != 1 ) return 0;
     val= (value & 0xFF0000)>>16;
     rc1=[self write: &val maxLength:1];
-    assert(rc1 == 1);
+    if( rc1 != 1 ) return 0;
+    return 1;
 }
 
 -(NSNumber*) readLengthCodedLength:(UInt8**) byteDataPtr {
@@ -145,143 +160,138 @@
     }
 }
 
-
--(void) sendPacket:(NSData*)packet {
-    //todo ensure not bigger than 16M (I suspect we'll have overflows in the next line : )
-    
-    [self sendUint32:(UInt32)[packet length]];
-    
-    int rc1= [self write:&packetNumber maxLength:1];
-    assert( rc1 == 1 );
-    rc1= [self write:[packet bytes] maxLength:[packet length]];
-    assert( rc1 == [packet length] );
-    
-    NSLog(@"Sent Packet Number : %d of size %ul", packetNumber,[packet length]);
-}
-
--(void) handshakeForUserName:(NSString*)user password:(NSString*)password {
+-(int) handshakeForUserName:(NSString*)user password:(NSString*)password {
     NSData* handshakeInitialisationPacket= [self readPacket];
-    NSMutableData *scrambleBuffer= [[NSMutableData alloc] initWithCapacity:100];
-    
-    UInt8* byteData= (UInt8*)[handshakeInitialisationPacket bytes];
-    UInt8 protcol_version= *(byteData++);
-    NSString* server_version= [NSString stringWithCString: (const char*)byteData
-                                                 encoding:NSASCIIStringEncoding];
-    byteData+=[server_version length]+1; // assumes 1byteperchar [ascii]
-    byteData+=4; // Skip the thread_id
-    [scrambleBuffer appendBytes:byteData length:8];
-    byteData+=8;
-    assert(*byteData++ == 0 ); //filler check.
-    
-    UInt32 server_capabilities= ( ((*byteData)<<8) + *(byteData+1));
-    byteData+=2;
-    UInt8 server_language= *byteData;
-    byteData+=2; // Skip  server_status;
-    server_capabilities= server_capabilities + ( ((*byteData)<<16) + ((*(byteData+1))<<24));
-    byteData+=14; // Skip the fller, scramble length etc.
-    
-    // hard-coded 12 here is wrong, should scan upto the null pointer end.
-    [scrambleBuffer appendBytes:byteData length:12];
-    byteData+=12;
-    assert( *byteData == 0 );
-    
-    [handshakeInitialisationPacket release];
-    NSLog(@"Handshaking to Server Version '%@' using Protocol version: %d Language: %d", server_version, protcol_version, server_language);
-    
-    NSMutableData *client_auth_packet= [[NSMutableData alloc] initWithCapacity:100];
-    UInt32 client_capabilities= server_capabilities;
-    client_capabilities= client_capabilities &~ 8; // Not specifying database on connection.
-    client_capabilities= client_capabilities &~ 32; // Do not use compression
-    client_capabilities= client_capabilities &~ 64; // this is not an odbc client
-    client_capabilities= client_capabilities &~ 1024; // this is not an interactive session
-    client_capabilities= client_capabilities &~ 2048; // do not switch to ssl    
-    client_capabilities= client_capabilities | 512; // new 4.1 protocol
-    client_capabilities= client_capabilities | 32768; // New 4.1 authentication
-    
-    
-    uint8_t val= client_capabilities & 0xFF;
-    [client_auth_packet appendBytes:&val length:1];
-    val= (client_capabilities & 0xFF00)>>8;
-    [client_auth_packet appendBytes:&val length:1];
-    val= (client_capabilities & 0xFF0000)>>16;
-    [client_auth_packet appendBytes:&val length:1];
-    val= (client_capabilities & 0xFF000000)>>24;
-    [client_auth_packet appendBytes:&val length:1];
-    
-    UInt32 max_packet_size= 65536;
-    val= max_packet_size & 0xFF;
-    [client_auth_packet appendBytes:&val length:1];
-    val= (max_packet_size & 0xFF00)>>8;
-    [client_auth_packet appendBytes:&val length:1];
-    val= (max_packet_size & 0xFF0000)>>16;
-    [client_auth_packet appendBytes:&val length:1];
-    val= (max_packet_size & 0xFF000000)>>24;
-    [client_auth_packet appendBytes:&val length:1];    
-    
-    [client_auth_packet appendBytes:&server_language length:1];    
-    val=0;
-    int i=0;
-    for(i=0;i<23;i++) {
-        [client_auth_packet appendBytes:&val length:1];        
-    } 
-    const char* user_c_str= [user cStringUsingEncoding:NSASCIIStringEncoding];
-    [client_auth_packet appendBytes:user_c_str length:strlen(user_c_str)];
-    [client_auth_packet appendBytes:&val length:1];        
-    
-    CC_SHA1_CTX context;
-    unsigned char stage1[CC_SHA1_DIGEST_LENGTH];
-    unsigned char stage2[CC_SHA1_DIGEST_LENGTH];
-    unsigned char stage3[CC_SHA1_DIGEST_LENGTH];
-    memset(stage1, 0, CC_SHA1_DIGEST_LENGTH);
-    memset(stage2, 0, CC_SHA1_DIGEST_LENGTH);
-    memset(stage3, 0, CC_SHA1_DIGEST_LENGTH);
-    const char* cstr_password=[password cStringUsingEncoding:NSASCIIStringEncoding]; // No idea if mysql alows non ascii passwords *sob*
-    
-    CC_SHA1_Init(&context);
-    CC_SHA1_Update(&context, cstr_password, strlen(cstr_password));
-    CC_SHA1_Final(stage1, &context);
-    
-    CC_SHA1_Init(&context);
-    CC_SHA1_Update(&context, stage1, CC_SHA1_DIGEST_LENGTH);
-    CC_SHA1_Final(stage2, &context);
-    
-    CC_SHA1_Init(&context);    
-    CC_SHA1_Update(&context,[scrambleBuffer bytes], [scrambleBuffer length]);
-    CC_SHA1_Update(&context, stage2, CC_SHA1_DIGEST_LENGTH);
-    CC_SHA1_Final(stage3, &context);
-    
-    unsigned char token[CC_SHA1_DIGEST_LENGTH];
-    for(i= 0;i< CC_SHA1_DIGEST_LENGTH;i++) {
-        token[i]= stage3[i]^stage1[i];
-    }
-    [scrambleBuffer release];
-    
-    val=CC_SHA1_DIGEST_LENGTH;
-    [client_auth_packet appendBytes:&val length:1];
-    [client_auth_packet appendBytes:&token length:CC_SHA1_DIGEST_LENGTH];
-    
-    [self sendPacket:client_auth_packet];
-    [client_auth_packet release];
-    NSData* okOrErrorPacket= [self readPacket];
-    UInt8* resultPacketData= (UInt8*)[okOrErrorPacket bytes];
-    if( resultPacketData[0] == 0xFF ) {
-        uint16_t errorNumber= resultPacketData[1] + (resultPacketData[2]<<8);
-        // sqlstate is chars 3-> 8
-        NSString* errorMessage= [NSString stringWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
+    if( handshakeInitialisationPacket ) {
+        NSMutableData *scrambleBuffer= [[NSMutableData alloc] initWithCapacity:100];
         
-        NSLog(@"ERROR: %@ (%u)", errorMessage, errorNumber);
-        for(int i=0;i< [okOrErrorPacket length]; i++ ) {
-            fprintf(stderr, "%x ", resultPacketData[i]);
+        UInt8* byteData= (UInt8*)[handshakeInitialisationPacket bytes];
+        UInt8 protcol_version= *(byteData++);
+        NSString* server_version= [NSString stringWithCString: (const char*)byteData
+                                                     encoding:NSASCIIStringEncoding];
+        byteData+=[server_version length]+1; // assumes 1byteperchar [ascii]
+        byteData+=4; // Skip the thread_id
+        [scrambleBuffer appendBytes:byteData length:8];
+        byteData+=8;
+        assert(*byteData++ == 0 ); //filler check.
+        
+        UInt32 server_capabilities= ( ((*byteData)<<8) + *(byteData+1));
+        byteData+=2;
+        UInt8 server_language= *byteData;
+        byteData+=2; // Skip  server_status;
+        server_capabilities= server_capabilities + ( ((*byteData)<<16) + ((*(byteData+1))<<24));
+        byteData+=14; // Skip the fller, scramble length etc.
+        
+        // hard-coded 12 here is wrong, should scan upto the null pointer end.
+        [scrambleBuffer appendBytes:byteData length:12];
+        byteData+=12;
+        assert( *byteData == 0 );
+        
+        [handshakeInitialisationPacket release];
+        NSLog(@"Handshaking to Server Version '%@' using Protocol version: %d Language: %d", server_version, protcol_version, server_language);
+        
+        NSMutableData *client_auth_packet= [[NSMutableData alloc] initWithCapacity:100];
+        UInt32 client_capabilities= server_capabilities;
+        client_capabilities= client_capabilities &~ 8; // Not specifying database on connection.
+        client_capabilities= client_capabilities &~ 32; // Do not use compression
+        client_capabilities= client_capabilities &~ 64; // this is not an odbc client
+        client_capabilities= client_capabilities &~ 1024; // this is not an interactive session
+        client_capabilities= client_capabilities &~ 2048; // do not switch to ssl    
+        client_capabilities= client_capabilities | 512; // new 4.1 protocol
+        client_capabilities= client_capabilities | 32768; // New 4.1 authentication
+        
+        
+        uint8_t val= client_capabilities & 0xFF;
+        [client_auth_packet appendBytes:&val length:1];
+        val= (client_capabilities & 0xFF00)>>8;
+        [client_auth_packet appendBytes:&val length:1];
+        val= (client_capabilities & 0xFF0000)>>16;
+        [client_auth_packet appendBytes:&val length:1];
+        val= (client_capabilities & 0xFF000000)>>24;
+        [client_auth_packet appendBytes:&val length:1];
+        
+        UInt32 max_packet_size= 65536;
+        val= max_packet_size & 0xFF;
+        [client_auth_packet appendBytes:&val length:1];
+        val= (max_packet_size & 0xFF00)>>8;
+        [client_auth_packet appendBytes:&val length:1];
+        val= (max_packet_size & 0xFF0000)>>16;
+        [client_auth_packet appendBytes:&val length:1];
+        val= (max_packet_size & 0xFF000000)>>24;
+        [client_auth_packet appendBytes:&val length:1];    
+        
+        [client_auth_packet appendBytes:&server_language length:1];    
+        val=0;
+        int i=0;
+        for(i=0;i<23;i++) {
+            [client_auth_packet appendBytes:&val length:1];        
+        } 
+        const char* user_c_str= [user cStringUsingEncoding:NSASCIIStringEncoding];
+        [client_auth_packet appendBytes:user_c_str length:strlen(user_c_str)];
+        [client_auth_packet appendBytes:&val length:1];        
+        
+        CC_SHA1_CTX context;
+        unsigned char stage1[CC_SHA1_DIGEST_LENGTH];
+        unsigned char stage2[CC_SHA1_DIGEST_LENGTH];
+        unsigned char stage3[CC_SHA1_DIGEST_LENGTH];
+        memset(stage1, 0, CC_SHA1_DIGEST_LENGTH);
+        memset(stage2, 0, CC_SHA1_DIGEST_LENGTH);
+        memset(stage3, 0, CC_SHA1_DIGEST_LENGTH);
+        const char* cstr_password=[password cStringUsingEncoding:NSASCIIStringEncoding]; // No idea if mysql alows non ascii passwords *sob*
+        
+        CC_SHA1_Init(&context);
+        CC_SHA1_Update(&context, cstr_password, strlen(cstr_password));
+        CC_SHA1_Final(stage1, &context);
+        
+        CC_SHA1_Init(&context);
+        CC_SHA1_Update(&context, stage1, CC_SHA1_DIGEST_LENGTH);
+        CC_SHA1_Final(stage2, &context);
+        
+        CC_SHA1_Init(&context);    
+        CC_SHA1_Update(&context,[scrambleBuffer bytes], [scrambleBuffer length]);
+        CC_SHA1_Update(&context, stage2, CC_SHA1_DIGEST_LENGTH);
+        CC_SHA1_Final(stage3, &context);
+        
+        unsigned char token[CC_SHA1_DIGEST_LENGTH];
+        for(i= 0;i< CC_SHA1_DIGEST_LENGTH;i++) {
+            token[i]= stage3[i]^stage1[i];
+        }
+        [scrambleBuffer release];
+        
+        val=CC_SHA1_DIGEST_LENGTH;
+        [client_auth_packet appendBytes:&val length:1];
+        [client_auth_packet appendBytes:&token length:CC_SHA1_DIGEST_LENGTH];
+        
+        [self sendPacket:client_auth_packet];
+        [client_auth_packet release];
+        NSData* okOrErrorPacket= [self readPacket];
+        if( okOrErrorPacket ) {
+            UInt8* resultPacketData= (UInt8*)[okOrErrorPacket bytes];
+            if( resultPacketData[0] == 0xFF ) {
+                uint16_t errorNumber= resultPacketData[1] + (resultPacketData[2]<<8);
+                // sqlstate is chars 3-> 8
+                NSString* errorMessage= [NSString stringWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
+                
+                NSLog(@"ERROR: %@ (%u)", errorMessage, errorNumber);
+                for(int i=0;i< [okOrErrorPacket length]; i++ ) {
+                    fprintf(stderr, "%x ", resultPacketData[i]);
+                }
+            }
+            else {
+//                NSLog(@"HAPPPY PACKET");
+            }
+            [okOrErrorPacket release];
+        } else {
+            return 0;
         }
     }
     else {
-        NSLog(@"HAPPPY PACKET");
-        
+        return 0;
     }
-    [okOrErrorPacket release];
+    return 1;
 }
 
--(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(void))block {
+-(void) sendCommand:(UInt8)command data:(NSData*)data continueWithBlock:(void (^)(int))block {
     [data retain];
     // Dispatch onto our FIFO queue, only one sendCommand (and its continuation block) can occur at a time
     dispatch_async( queue, ^{
@@ -290,11 +300,11 @@
         if ( data != NULL ) {
             [dataToSend appendData:data];
         }
-        [self sendPacket:dataToSend];
+        int result= [self sendPacket:dataToSend];
         [dataToSend release];
         if ( data != NULL ) { [data release]; }
         if( block != NULL ) {
-            block();
+            block( result );
         }
    });
 }

@@ -22,8 +22,12 @@
 
 -(id) initWithHost:(NSString *)host port:(UInt16)port user:(NSString *)user password:(NSString *)password;
 -(id) initWithProtocol:(MySqlProtocol*) __attribute__((ns_consumed)) protocol user:(NSString *)user password:(NSString *)password;
--(void) selectDatabase:(NSString*)database;
+
+// 'Non-Blocking' functions.
 -(void) performQuery:(NSString*)query continueWithBlock:(void (^)(MySqlResults *))block;
--(void) quit;
+
+// 'Blocking' functions.
+-(int) selectDatabase:(NSString*)database;
+-(int) quit;
 @end
 #endif

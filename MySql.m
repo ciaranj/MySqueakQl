@@ -18,10 +18,17 @@
 -(id) initWithProtocol:(MySqlProtocol*) __attribute__((ns_consumed)) protocol user:(NSString *)user password:(NSString *)password {
     if ( self = [super init] ) {
         protocolImpl= protocol;
-        [protocolImpl connect];
-        [protocolImpl handshakeForUserName:user
-                                  password:password];
+        if( [protocolImpl connect] ) {
+            if( ![protocolImpl handshakeForUserName:user
+                                          password:password] ) {
+                return NULL;
+            }
+        }
+        else {
+            return NULL;
+        }
     }
+    
     return self;
 }
 
@@ -38,44 +45,52 @@
     [super dealloc];
 }
 
--(void) selectDatabase:(NSString*)database {
+-(int) selectDatabase:(NSString*)database {
     volatile __block bool blockCalled= false;
+    volatile __block int selectDBResult= 0;
     
-    NSLog(@"Select Database");    
     NSData* data=[database dataUsingEncoding:NSUTF8StringEncoding];
-    [protocolImpl sendCommand:2 data:data continueWithBlock:^(){
+    [protocolImpl sendCommand:2 data:data continueWithBlock:^(int result){
+            if( result ) {
                 NSData* okOrErrorPacket= [protocolImpl readPacket];
-                UInt8* resultPacketData= (UInt8*)[okOrErrorPacket bytes];
-                if( resultPacketData[0] == 0xFF ) {
-                    uint16_t errorNumber= resultPacketData[1] + (resultPacketData[2]<<8);
-                    // sqlstate is chars 3-> 8
-                    
-                    NSString* errorMessage= [[NSString alloc] initWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
-                    
-                    NSLog(@"ERROR: %@ (%u)", errorMessage, errorNumber);
-                    for(int i=0;i< [okOrErrorPacket length]; i++ ) {
-                        fprintf(stderr, "%x ", resultPacketData[i]);
+                if( okOrErrorPacket ) {
+                    UInt8* resultPacketData= (UInt8*)[okOrErrorPacket bytes];
+                    if( resultPacketData[0] == 0xFF ) {
+                        uint16_t errorNumber= resultPacketData[1] + (resultPacketData[2]<<8);
+                        // sqlstate is chars 3-> 8
+                        
+                        NSString* errorMessage= [[NSString alloc] initWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
+                        
+                        NSLog(@"ERROR: %@ (%u)", errorMessage, errorNumber);
+                        for(int i=0;i< [okOrErrorPacket length]; i++ ) {
+                            fprintf(stderr, "%x ", resultPacketData[i]);
+                        }
+                        [errorMessage release];
+
+                        selectDBResult= -1;
                     }
-                    [errorMessage release];
+                    else {
+                        selectDBResult= 1;
+                    }
+                    [okOrErrorPacket release];
                 }
-                else {
-                    NSLog(@"HAPPPY PACKET");
-                }
-                [okOrErrorPacket release];
-                blockCalled= true;
-            }];
+            } else {
+                selectDBResult= result;
+            }
+            blockCalled= true;
+    }];
     // As an attempt to simplify the external API, we
     // simulate a blocking API by blocking the calling thread, until
     // the command's callback block has executed.
     while(!blockCalled) {
-        [NSThread sleepForTimeInterval:0.01];
+        [NSThread sleepForTimeInterval:0.25];
     }
+    return selectDBResult;
 }
 
 -(void) performQuery:(NSString*)query continueWithBlock:(void (^)(MySqlResults* results))block {
-    NSLog(@"Execute Query");
     NSData* data=[query dataUsingEncoding:NSUTF8StringEncoding];
-    [protocolImpl sendCommand:3  data:data continueWithBlock:^(){
+    [protocolImpl sendCommand:3  data:data continueWithBlock:^(int result){
                 NSData* initialServerResponsePacket= [protocolImpl readPacket];
                 UInt8* resultPacketData= (UInt8*)[initialServerResponsePacket bytes];
                 MySqlResults* results= [[MySqlResults alloc] init];
@@ -84,7 +99,8 @@
                     // sqlstate is chars 3-> 8
                     
                     NSString* errorMessage= [NSString stringWithCString: (const char*)(resultPacketData+9) encoding:NSASCIIStringEncoding];
-                    
+                    //TODO: this is confusing as it will display older packet's data as it doesn't check the termination boundary
+                    //of the string..dumb...
                     NSLog(@"ERROR: %@ (%u)", errorMessage, errorNumber);
                 }
                 else {
@@ -163,21 +179,23 @@
             }];
 }
 
--(void) quit {
-    NSLog(@"Quit");
+-(int) quit {
     volatile __block bool blockCalled= false;
-    [protocolImpl sendCommand:1 data:NULL continueWithBlock:^(){
+    volatile __block int quitResult= 0;
+    [protocolImpl sendCommand:1 data:NULL continueWithBlock:^(int result){
         blockCalled= true;
+        quitResult= result;
     }];
 
     // As an attempt to simplify the external API, we
     // simulate a blocking API by blocking the calling thread, until
     // the command's callback block has executed.
     while(!blockCalled) {
-        [NSThread sleepForTimeInterval:0.01];
+        [NSThread sleepForTimeInterval:0.25];
     }
     [protocolImpl dealloc];
     protocolImpl= NULL;
+    return quitResult;
 }
 
 @end
